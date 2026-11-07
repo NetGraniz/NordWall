@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII / Waves</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { display: grid; place-items: center; background: #080b18; color: #97aaff;
+      font-family: Consolas, 'Courier New', monospace; }
+    .container { text-align: center; width: 100%; }
+    pre { margin: 0 auto; line-height: 1.14; letter-spacing: .035em;
+      font-size: clamp(6px, .90vw, 14px); color: #9eb4ff; }
+    h1 { font-size: clamp(15px, 2vw, 28px); letter-spacing: .5em;
+      font-weight: 400; margin: 32px 0 0; color: #c5d0ff; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <pre id="waves" aria-label="Animated waves made of ASCII characters"></pre>
+    <h1>ASCII WAVES</h1>
+  </div>
+  <script>
+    'use strict';
+    const output = document.getElementById('waves');
+    const palette = '  .,:;i1tfLCG08@';
+    const frames = [];
+    const cols = 95;
+    const rows = 33;
+    const frameCount = 96;
+
+    // All moving terms complete an integer number of cycles. Previously,
+    // unrelated linear phase offsets jumped when the loop returned to zero.
+    for (let phase = 0; phase < frameCount; phase++) {
+      const angle = phase * Math.PI * 2 / frameCount;
+      let text = '';
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const dx = (x - cols / 2) / cols;
+          const dy = (y - rows / 2) / rows;
+          const distance = Math.hypot(dx * 1.4, dy);
+          const wave = Math.cos(distance * 32 - 2 * angle)
+            * Math.sin(x * .105 + angle)
+            + .42 * Math.cos(y * .23 + angle);
+          const fade = Math.max(0, 1 - distance * 1.5);
+          const strength = Math.max(0, Math.min(.999, (.52 + wave * .31) * fade));
+          text += palette[Math.floor(strength * palette.length)];
+        }
+        text += '\n';
+      }
+      frames.push(text);
+    }
+
+    let current = 0;
+    output.textContent = frames[0];
+    setInterval(() => {
+      current = (current + 1) % frames.length;
+      output.textContent = frames[current];
+    }, 90);
+  </script>
+</body>
+</html>

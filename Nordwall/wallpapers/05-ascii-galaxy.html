@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII / Galaxy</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { display: grid; place-items: center; background:
+      radial-gradient(ellipse at 50% 49%, #171626 0%, #080a16 45%, #03040a 90%);
+      font-family: Consolas, 'Courier New', monospace; }
+    main { text-align: center; width: 100%; }
+    pre { margin: 0 auto; line-height: 1.11; letter-spacing: .02em;
+      font-size: clamp(6px, .87vw, 14px);
+      background: linear-gradient(130deg, #627caf 8%, #e2c99c 46%, #927ab9 90%);
+      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    h1 { margin: 22px 0 8px; font-weight: 400; letter-spacing: .58em;
+      font-size: clamp(15px, 1.6vw, 25px); color: #d2c7da; }
+  </style>
+</head>
+<body>
+  <main>
+    <pre id="galaxy" aria-label="Slowly rotating spiral galaxy made of ASCII characters"></pre>
+    <h1>ASCII / GALAXY</h1>
+  </main>
+  <script>
+    'use strict';
+    const output = document.getElementById('galaxy');
+    const palette = '    ..,:;-=+*#%@';
+    const frames = [];
+    const cols = 97;
+    const rows = 37;
+    const frameCount = 100;
+
+    function hash(x, y) {
+      const n = Math.sin(x * 93.9898 + y * 67.345) * 47583.123;
+      return n - Math.floor(n);
+    }
+
+    for (let frame = 0; frame < frameCount; frame++) {
+      const angle = Math.PI * 2 * frame / frameCount;
+      let text = '';
+      for (let y = 0; y < rows; y++) {
+        let line = '';
+        for (let x = 0; x < cols; x++) {
+          const xx = (x - (cols - 1) / 2) / (cols * .47);
+          const yy = (y - (rows - 1) / 2) / (rows * .46);
+          const radius = Math.hypot(xx, yy);
+          const direction = Math.atan2(yy, xx);
+          const spiral = .5 + .5 * Math.cos(4 * direction + 13 * radius - 2 * angle);
+          const arms = Math.pow(spiral, 6) * Math.exp(-radius * radius * 2.6);
+          const core = Math.exp(-radius * radius * 23);
+          const dust = .16 * Math.exp(-radius * radius * 3);
+          const light = Math.min(.999, arms * .82 + core * .85 + dust);
+          const star = hash(x, y);
+
+          if (light < .16 && star > .989) {
+            line += star > .996 ? '+' : '.';
+          } else {
+            line += palette[Math.floor(Math.max(0, light) * palette.length)];
+          }
+        }
+        text += line + '\n';
+      }
+      frames.push(text);
+    }
+
+    let current = 0;
+    output.textContent = frames[0];
+    setInterval(() => {
+      current = (current + 1) % frameCount;
+      output.textContent = frames[current];
+    }, 95);
+  </script>
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Nordwall video player</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #050608; }
+    video { display: block; width: 100vw; height: 100vh; object-fit: cover; }
+    #message { display: none; position: fixed; left: 30px; bottom: 30px;
+      font: 14px/1.6 Consolas, monospace; color: #d0e6d8; }
+  </style>
+</head>
+<body>
+  <video id="wallpaper" autoplay muted loop playsinline preload="auto" disablepictureinpicture></video>
+  <div id="message" role="status"></div>
+  <script>
+    'use strict';
+    const video = document.getElementById('wallpaper');
+    const message = document.getElementById('message');
+    const value = new URLSearchParams(location.search).get('src');
+    const source = value ? new URL(value) : null;
+
+    if (!source || source.protocol !== 'https:' || source.hostname !== 'wallpapers.example') {
+      message.textContent = 'Invalid local video source';
+      message.style.display = 'block';
+    } else {
+      video.src = source.href;
+      video.play().catch(() => {
+        message.textContent = 'Could not start video playback';
+        message.style.display = 'block';
+      });
+      video.addEventListener('error', () => {
+        message.textContent = 'Video format is not supported by WebView2';
+        message.style.display = 'block';
+      });
+    }
+  </script>
+</body>
+</html>

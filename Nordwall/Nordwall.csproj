@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <AssemblyName>Nordwall</AssemblyName>
+    <RootNamespace>Nordwall</RootNamespace>
+    <ApplicationIcon>assets\nordwall.ico</ApplicationIcon>
+    <Product>Nordwall</Product>
+    <Version>0.3.0</Version>
+    <UseAppHost>true</UseAppHost>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Embed the app's own assets. Sample wallpapers stay source-only, so
+         a published EXE never ships or reinstalls user wallpaper content. -->
+    <EmbeddedResource Include="assets\video-player.html" LogicalName="Nordwall.Bundled.VideoPlayer" />
+    <EmbeddedResource Include="assets\nordwall.ico" LogicalName="Nordwall.Bundled.Icon" />
+    <EmbeddedResource Include="assets\nordwall.png" LogicalName="Nordwall.Bundled.Png" />
+    <EmbeddedResource Include="assets\nordwall.svg" LogicalName="Nordwall.Bundled.Svg" />
+    <None Update="assets\**\*;wallpapers\**\*"
+          CopyToOutputDirectory="Never"
+          CopyToPublishDirectory="Never" />
+  </ItemGroup>
+
+  <!-- WebView2 brings a WPF assembly into WinForms-only projects, causing
+       MSB3277 (WindowsBase v4/v5). Exclude just the unused WPF reference. -->
+  <Target Name="RemoveWebView2WpfReference" BeforeTargets="ResolveAssemblyReferences"
+          Condition="'$(UseWindowsForms)' == 'true' and '$(UseWPF)' != 'true'">
+    <ItemGroup>
+      <_WebView2WpfReference Include="@(Reference)"
+                             Condition="'%(FileName)' == 'Microsoft.Web.WebView2.Wpf'" />
+      <Reference Remove="@(_WebView2WpfReference)" />
+    </ItemGroup>
+  </Target>
+</Project>

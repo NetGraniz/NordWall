@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII / Aurora</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { display: grid; place-items: center; background:
+      radial-gradient(ellipse at 51% 35%, #11172f 0%, #080b1d 45%, #04050e 90%);
+      font-family: Consolas, 'Courier New', monospace; }
+    main { width: 100%; text-align: center; transform: translateY(-2vh); }
+    pre { margin: 0 auto; line-height: 1.17; letter-spacing: .015em;
+      font-size: clamp(6px, .88vw, 13px);
+      background: linear-gradient(90deg, #59a7b3, #a7dcac 32%, #b1a7e6 70%, #467bba);
+      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    h1 { margin: 26px 0 8px; color: #d1d6f3; font-size: clamp(15px, 1.6vw, 25px);
+      font-weight: 400; letter-spacing: .52em; }
+  </style>
+</head>
+<body>
+  <main>
+    <pre id="aurora" aria-label="Slow glowing northern lights drawn in ASCII"></pre>
+    <h1>ASCII / AURORA</h1>
+  </main>
+  <script>
+    'use strict';
+    const output = document.getElementById('aurora');
+    const palette = '    ..,,::;;==++**##%%@@';
+    const frames = [];
+    const cols = 99;
+    const rows = 35;
+    const frameCount = 96;
+    const tau = Math.PI * 2;
+
+    function hash(x, y) {
+      const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+      return n - Math.floor(n);
+    }
+
+    for (let frame = 0; frame < frameCount; frame++) {
+      const phase = frame / frameCount;
+      let text = '';
+      for (let y = 0; y < rows; y++) {
+        let line = '';
+        const v = y / (rows - 1);
+        for (let x = 0; x < cols; x++) {
+          const u = x / (cols - 1);
+          const top = .34 + .11 * Math.sin(tau * (u * 1.4 + phase))
+            + .04 * Math.sin(tau * (u * 2.8 - phase));
+          const bottom = .64 + .085 * Math.cos(tau * (u * 1.1 - phase));
+          const d1 = (v - top) / .095;
+          const d2 = (v - bottom) / .075;
+          const ribbon1 = Math.exp(-d1 * d1 * 1.5)
+            * (.72 + .28 * Math.cos(tau * (u * 4 + phase)));
+          const ribbon2 = Math.exp(-d2 * d2 * 1.8)
+            * (.49 + .23 * Math.sin(tau * (u * 3 - phase)));
+          const light = Math.min(.999, Math.max(0, ribbon1 + ribbon2));
+          const star = hash(x, y);
+
+          if (light < .13 && v < .43 && star > .994) {
+            line += Math.cos(tau * phase + star * 14) > .3 ? '+' : '.';
+          } else {
+            line += palette[Math.floor(light * palette.length)];
+          }
+        }
+        text += line + '\n';
+      }
+      frames.push(text);
+    }
+
+    let current = 0;
+    output.textContent = frames[0];
+    setInterval(() => {
+      current = (current + 1) % frameCount;
+      output.textContent = frames[current];
+    }, 95);
+  </script>
+</body>
+</html>

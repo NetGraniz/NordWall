@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII / Orbit</title>
+  <style>
+    :root { color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+    body { display: grid; place-items: center;
+      background: radial-gradient(ellipse at 50% 45%, #0b1e1d 0%, #040b0d 36%, #020506 75%);
+      color: #8bdcc9; font-family: Consolas, 'Courier New', monospace; }
+    main { text-align: center; transform: translateY(-2vh); }
+    pre { margin: 0; line-height: 1; letter-spacing: 0.035em;
+      font-size: clamp(7px, 1.07vw, 15px); font-weight: bold;
+      color: #75eac7; text-shadow: 0 0 14px #36ae8c66; }
+    h1 { margin: 22px 0 8px; color: #bee9db; letter-spacing: .58em;
+      font-size: clamp(14px, 1.35vw, 23px); font-weight: 400; }
+    @media (prefers-reduced-motion: reduce) { pre { text-shadow: none; } }
+  </style>
+</head>
+<body>
+  <main>
+    <pre id="orbit" aria-label="Rotating sphere made of text characters"></pre>
+    <h1>ASCII / ORBIT</h1>
+  </main>
+  <script>
+    'use strict';
+    const output = document.getElementById('orbit');
+    const glyphs = '  .:-=+*#%@';
+    const frames = [];
+    const width = 65;
+    const height = 33;
+    const radiusX = 29;
+    const radiusY = 15.3;
+    const frameCount = 96;
+
+    // Every angle is sampled on the same 2π-periodic path. There is no
+    // duplicated endpoint or reset frame at the wrap-around.
+    for (let phase = 0; phase < frameCount; phase++) {
+      const angle = phase * Math.PI * 2 / frameCount;
+      const rows = [];
+      for (let y = 0; y < height; y++) {
+        let row = '';
+        const yy = (y - (height - 1) / 2) / radiusY;
+        for (let x = 0; x < width; x++) {
+          const xx = (x - (width - 1) / 2) / radiusX;
+          const rr = xx * xx + yy * yy;
+          if (rr >= 1) { row += ' '; continue; }
+
+          const zz = Math.sqrt(1 - rr);
+          const longitude = Math.atan2(xx, zz) + angle;
+          const latitude = Math.asin(yy);
+          const bands = Math.sin(longitude * 5 + Math.sin(latitude * 4) * 1.8)
+            * Math.cos(latitude * 9 - longitude * 2);
+          const grid = Math.sin(longitude * 11) * Math.sin(latitude * 13);
+          const light = .19 + .46 * zz + .18 * bands + .08 * grid - .13 * xx;
+          const index = Math.max(1, Math.min(glyphs.length - 1,
+            Math.floor(light * glyphs.length)));
+          row += glyphs[index];
+        }
+        rows.push(row);
+      }
+      frames.push(rows.join('\n'));
+    }
+
+    let index = 0;
+    output.textContent = frames[0];
+    setInterval(() => {
+      index = (index + 1) % frames.length;
+      output.textContent = frames[index];
+    }, 80);
+  </script>
+</body>
+</html>
