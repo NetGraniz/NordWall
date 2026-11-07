@@ -10,7 +10,7 @@ This repository is a source project, ready for development and publication on Gi
 
 ![Example](Nordwall/assets/example.gif)
 
-Wallpaper creator: https://www.youtube.com/watch?v=gU4vSEZwiyE
+Animation is taken from: https://www.youtube.com/watch?v=gU4vSEZwiyE
 
 ## Run from source
 
