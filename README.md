@@ -8,6 +8,10 @@ This repository is a source project, ready for development and publication on Gi
 
 > **Status:** early release candidate. The desktop embedding code has been tested on Windows 11, but the new embedded-content standalone release still needs verification on Windows. Multi-monitor support and automatic game detection are not included yet.
 
+![Example](Nordwall/assets/example.gif)
+
+Wallpaper creator: https://www.youtube.com/watch?v=gU4vSEZwiyE
+
 ## Run from source
 
 Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), download the source, and double-click `run.cmd`.
