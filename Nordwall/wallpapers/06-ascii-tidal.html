@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII / Tidal</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { display: grid; place-items: center; background:
+      radial-gradient(ellipse at 50% 66%, #102b40 0%, #071522 51%, #030a12 100%);
+      font-family: Consolas, 'Courier New', monospace; }
+    main { width: 100%; text-align: center; transform: translateY(-1vh); }
+    pre { margin: 0 auto; width: max-content; max-width: 100%; font-size: clamp(6px, .92vw, 16px);
+      line-height: 1.13; letter-spacing: .015em;
+      background: linear-gradient(180deg, #6a8a9c, #9ce9ea 42%, #4387b4 76%, #1c4776);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      text-shadow: 0 0 24px #123a4b22; }
+    h1 { margin: 22px 0 0; font-size: clamp(15px, 1.5vw, 25px);
+      font-weight: 400; letter-spacing: .53em; color: #b4dce6; }
+  </style>
+</head>
+<body>
+  <main>
+    <pre id="scene" aria-label="Rolling three-dimensional ASCII ocean"></pre>
+    <h1>ASCII / TIDAL</h1>
+  </main>
+  <script>
+    'use strict';
+    const scene = document.getElementById('scene');
+    const cols = 105, rows = 37, frameCount = 120;
+    const tau = Math.PI * 2;
+    const shades = '    ...,,::--==++**##%%@@';
+    const frames = [];
+
+    for (let frame = 0; frame < frameCount; frame++) {
+      const phase = frame * tau / frameCount;
+      let picture = '';
+      for (let y = 0; y < rows; y++) {
+        const v = y / (rows - 1);
+        const depth = Math.max(.001, (v - .20) / .80);
+        const z = 1.25 / (depth + .13);
+        for (let x = 0; x < cols; x++) {
+          if (v < .20) {
+            picture += Math.abs(v - .19) < .013 && x % 3 !== 0 ? '.' : ' ';
+            continue;
+          }
+          const u = (x / (cols - 1) - .5) * 2;
+          const worldX = u * (1.5 + z * 1.85);
+          const swell = Math.sin(worldX * .81 + z * .45 - phase * 2)
+            + .42 * Math.cos(worldX * 1.36 - z * .21 + phase);
+          const crest = Math.pow(.5 + .5 * Math.sin(
+            z * 2.7 - swell * .88 + phase * 2), 7);
+          const cross = Math.pow(.5 + .5 * Math.cos(
+            worldX * .92 + z * .4 + phase), 10);
+          const shimmer = Math.pow(.5 + .5 * Math.sin(
+            worldX * 2.4 + z * .73 - phase), 8);
+          const light = Math.min(.999, Math.max(0,
+            (.07 + crest * .70 + cross * .20 + shimmer * .21)
+            * (.35 + depth * .76)));
+          picture += shades[Math.floor(light * shades.length)];
+        }
+        picture += '\n';
+      }
+      frames.push(picture);
+    }
+
+    let index = 0;
+    scene.textContent = frames[0];
+    setInterval(() => {
+      index = (index + 1) % frames.length;
+      scene.textContent = frames[index];
+    }, 82);
+  </script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII / Pulse</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { display: grid; place-items: center; background:
+      radial-gradient(ellipse at 50% 69%, #152a39 0%, #0b1226 43%, #050711 100%);
+      font-family: Consolas, 'Courier New', monospace; }
+    main { width: 100%; text-align: center; }
+    pre { margin: 0 auto; width: max-content; max-width: 100%; font-size: clamp(6px, .95vw, 16px);
+      line-height: 1.15; letter-spacing: .005em;
+      background: linear-gradient(180deg, #bc9bfa 0%, #92b7ff 39%, #60e1d7 76%, #387d9d);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+      filter: drop-shadow(0 0 5px #3bb9d529); }
+    h1 { margin: 23px 0 0; font-size: clamp(15px, 1.5vw, 25px);
+      font-weight: 400; letter-spacing: .53em; color: #b7cafa; }
+  </style>
+</head>
+<body>
+  <main>
+    <pre id="scene" aria-label="A pulsating ASCII spectrum visualizer"></pre>
+    <h1>ASCII / PULSE</h1>
+  </main>
+  <script>
+    'use strict';
+    const scene = document.getElementById('scene');
+    const cols = 103, rows = 37, frameCount = 120;
+    const tau = Math.PI * 2;
+    const frames = [];
+    const barCount = 24;
+
+    function hash(x, y) {
+      const n = Math.sin(x * 93.9898 + y * 67.345) * 47583.123;
+      return n - Math.floor(n);
+    }
+
+    for (let frame = 0; frame < frameCount; frame++) {
+      const phase = frame * tau / frameCount;
+      let picture = '';
+      for (let y = 0; y < rows; y++) {
+        for (let x = 0; x < cols; x++) {
+          const localX = x - 4;
+          const bar = Math.floor(localX / 4);
+          const inBar = localX >= 0 && bar < barCount && localX % 4 < 2;
+          const beat = .47 + .24 * Math.sin(phase * 2 + bar * .52)
+            + .14 * Math.sin(phase * 3 - bar * .79)
+            + .10 * Math.cos(phase + bar * .21);
+          const height = 4 + Math.floor(Math.max(0, Math.min(.99, beat)) * 26);
+          const top = rows - 4 - height;
+
+          if (y === rows - 3 && x >= 2 && x < cols - 2) {
+            picture += '-';
+          } else if (inBar && y >= top && y < rows - 3) {
+            if (y === top) picture += '@';
+            else if (y - top < 3) picture += '#';
+            else if ((rows - y) % 5 === 0) picture += '=';
+            else picture += '|';
+          } else if (y < rows * .34 && hash(x, y) > .993) {
+            picture += Math.sin(phase * 2 + x * .13) > .1 ? '+' : '.';
+          } else if (y < rows - 3 && y > rows * .54
+                     && hash(x, y + 10) > .997) {
+            picture += '.';
+          } else {
+            picture += ' ';
+          }
+        }
+        picture += '\n';
+      }
+      frames.push(picture);
+    }
+
+    let index = 0;
+    scene.textContent = frames[0];
+    setInterval(() => {
+      index = (index + 1) % frames.length;
+      scene.textContent = frames[index];
+    }, 85);
+  </script>
+</body>
+</html>

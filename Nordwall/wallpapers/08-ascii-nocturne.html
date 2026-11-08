@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ASCII / Nocturne</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    body { display: grid; place-items: center; background:
+      radial-gradient(ellipse at 68% 31%, #1c2440 0%, #090f23 47%, #040711 100%);
+      font-family: Consolas, 'Courier New', monospace; }
+    main { width: 100%; text-align: center; transform: translateY(-1vh); }
+    pre { margin: 0 auto; width: max-content; max-width: 100%;
+      font-size: clamp(6px, .90vw, 15px); line-height: 1.14; letter-spacing: .025em;
+      background: linear-gradient(180deg, #d9e3ff 5%, #889abf 45%, #6479ad 72%, #344d82);
+      -webkit-background-clip: text; background-clip: text; color: transparent; }
+    h1 { margin: 24px 0 0; font-size: clamp(15px, 1.5vw, 25px);
+      font-weight: 400; letter-spacing: .53em; color: #bbc9ea; }
+  </style>
+</head>
+<body>
+  <main>
+    <pre id="scene" aria-label="Moonlit ASCII mountains and drifting clouds"></pre>
+    <h1>ASCII / NOCTURNE</h1>
+  </main>
+  <script>
+    'use strict';
+    const scene = document.getElementById('scene');
+    const cols = 103, rows = 39, frameCount = 120;
+    const tau = Math.PI * 2;
+    const shades = '  ..,,::--==++**##%%@@';
+    const frames = [];
+
+    function hash(x, y) {
+      const n = Math.sin(x * 127.1 + y * 311.7) * 43758.5453;
+      return n - Math.floor(n);
+    }
+
+    for (let frame = 0; frame < frameCount; frame++) {
+      const phase = frame * tau / frameCount;
+      let picture = '';
+      for (let y = 0; y < rows; y++) {
+        const v = y / (rows - 1);
+        for (let x = 0; x < cols; x++) {
+          const u = x / (cols - 1);
+          const backRidge = .53 + .008 * Math.sin(phase + u * 5)
+            + .062 * Math.sin(u * tau * 1.8 + .3)
+            + .027 * Math.sin(u * tau * 4.4 + 1.2);
+          const middleRidge = .67 + .082 * Math.sin(u * tau * 2.6 + 1.7)
+            + .035 * Math.cos(u * tau * 5.9 + .4);
+          const frontRidge = .82 + .065 * Math.sin(u * tau * 2.0 + 3.4)
+            + .031 * Math.cos(u * tau * 8.1 + .7);
+          const rock = hash(x, y) * .19;
+
+          if (v > frontRidge) {
+            const height = Math.min(1, (v - frontRidge) / .24);
+            const shade = .49 + height * .24 + rock;
+            picture += shades[Math.min(shades.length - 1, Math.floor(shade * shades.length))];
+          } else if (v > middleRidge) {
+            const shade = .30 + (v - middleRidge) * .50 + rock * .65;
+            picture += shades[Math.floor(shade * shades.length)];
+          } else if (v > backRidge) {
+            const shade = .16 + (v - backRidge) * .55 + rock * .32;
+            picture += shades[Math.floor(shade * shades.length)];
+          } else {
+            const moon = Math.hypot((u - .73) / .055, (v - .23) / .095);
+            if (moon < .82) {
+              picture += hash(x, y) > .89 ? 'O' : '@';
+            } else if (moon < 1.13) {
+              picture += ':';
+            } else if (moon < 1.55 && hash(x, y) > .55) {
+              picture += '.';
+            } else {
+              const cloud = .37 + .045 * Math.sin(u * tau * 1.7 + phase)
+                + .018 * Math.cos(u * tau * 4.1 - phase * 2);
+              const thinCloud = .29 + .028 * Math.cos(u * tau * 2.2 - phase);
+              const wisps = hash(x, y) + .20 * Math.cos(phase * 2 + u * 12);
+              if (Math.abs(v - cloud) < .033 && wisps > .50) {
+                picture += hash(x + 2, y) > .58 ? '-' : '.';
+              } else if (Math.abs(v - thinCloud) < .018 && wisps > .73) {
+                picture += '.';
+              } else {
+                const star = hash(x, y);
+                picture += star > .992
+                  ? (Math.cos(phase * 2 + star * 23) > .1 ? '+' : '.')
+                  : star > .985 ? '.' : ' ';
+              }
+            }
+          }
+        }
+        picture += '\n';
+      }
+      frames.push(picture);
+    }
+
+    let index = 0;
+    scene.textContent = frames[0];
+    setInterval(() => {
+      index = (index + 1) % frames.length;
+      scene.textContent = frames[index];
+    }, 90);
+  </script>
+</body>
+</html>
