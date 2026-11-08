@@ -1,32 +1,100 @@
-# Nordwall
+<p align="center">
+  <img src="Nordwall/assets/nordwall.png" alt="Nordwall logo" width="120">
+</p>
 
-![Nordwall logo](Nordwall/assets/nordwall.png)
+<h1 align="center">Nordwall</h1>
 
-**Nordwall** is an experimental lightweight animated wallpaper engine for Windows 11. It plays offline HTML/ASCII animations and local MP4/WebM videos behind desktop icons. A system tray menu lists the available wallpapers each time you open it.
+<p align="center">
+  <strong>Lightweight animated wallpapers for Windows.</strong><br>
+  ASCII art, HTML animations, MP4 and WebM — with multi-monitor support.
+</p>
 
-This repository is a source project, ready for development and publication on GitHub. It includes five optional ASCII wallpaper examples in the source tree and a standalone Windows build script.
+<p align="center">
+  <a href="https://github.com/NetGraniz/NordWall/releases/latest"><strong>Download Nordwall</strong></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/NetGraniz/NordWall/releases/tag/v0.4.0">v0.4.0 Release</a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/NetGraniz/NordWall/issues">Issues &amp; feedback</a>
+</p>
 
-> **Status:** early release candidate. The desktop embedding code has been tested on Windows 11, but the new embedded-content standalone release still needs verification on Windows. Multi-monitor support and automatic game detection are not included yet.
+<p align="center">
+  <img src="Nordwall/assets/example.gif" alt="Animated wallpaper example" width="860">
+</p>
 
-![Example](Nordwall/assets/example.gif)
+<p align="center"><sub>Preview animation: <a href="https://www.youtube.com/watch?v=gU4vSEZwiyE">original video source</a>.</sub></p>
 
-Animation is taken from: https://www.youtube.com/watch?v=gU4vSEZwiyE
+---
 
-## Run from source
+Nordwall is a small, open-source animated wallpaper engine for **Windows 11**. It renders animations behind desktop icons, keeps your wallpapers in a regular folder, and stays out of the way in the system tray. It is designed to be lightweight, although actual CPU and GPU usage depends on the wallpaper and your hardware.
 
-Install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0), download the source, and double-click `run.cmd`.
+## Features
 
-Alternatively, run from the repository root:
+**Animated content.** Run local ASCII/HTML wallpapers (including custom CSS and JavaScript), or play muted, looping MP4 and WebM videos.
+
+**Multiple displays.** Choose independent wallpapers per monitor or a single animation stretched across all connected screens.
+
+**Smart playback.** Automatically suspend covered wallpapers when a fullscreen or maximized app opens, or pause everything manually from the system tray.
+
+**Easy to use.** Manage wallpapers and optional Windows autostart from one Settings window. The published single-file EXE includes its own .NET runtime and internal assets.
+
+### Multi-monitor modes
+
+| Mode | Wallpaper layout | Automatic pause behavior |
+| --- | --- | --- |
+| **Separate wallpapers** | Select a wallpaper for each screen. Every screen has its own renderer. | Pauses only the screen covered by a fullscreen or maximized app. |
+| **Span across displays** | One continuous wallpaper covers the entire Windows virtual desktop. A single renderer keeps it synchronized. | Pauses the entire wallpaper when a fullscreen or maximized app appears on any screen. |
+
+The **Settings** window contains a visual map of connected monitors. Click a display to assign its wallpaper. Nordwall reads monitor positions and resolutions from Windows, including screens placed to the left of or above the primary display.
+
+To rearrange monitors, use **Arrange displays…** in Nordwall Settings. This opens Windows Display Settings; changes are picked up automatically. The miniature display map is a selector, not a drag-and-drop layout editor.
+
+You can disable automatic fullscreen pausing in Settings. Manual **Pause / Resume** in the tray affects all displays.
+
+## Download and installation
+
+Download **`Nordwall.exe`** from the [latest GitHub release](https://github.com/NetGraniz/NordWall/releases/latest) and run it. No installer or .NET SDK is required to use the published EXE.
+
+Nordwall uses **Microsoft Edge WebView2 Runtime** to display HTML and video. It is typically already installed on Windows 11. If Nordwall reports that WebView2 is missing, install the [official WebView2 Runtime](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) and try again.
+
+At first launch, Nordwall creates an empty **`Documents\Wallpapers`** folder, respecting your Windows Documents location (including redirected folders). It never silently installs, restores or replaces your wallpaper files.
+
+Download the optional **`Wallpapers.2.0.rar`** pack from the [v0.4.0 release](https://github.com/NetGraniz/NordWall/releases/tag/v0.4.0), or add your own `.html`, `.htm`, `.mp4` and `.webm` files directly to `Documents\Wallpapers`. Then right-click the Nordwall tray icon, open **Settings**, select a monitor or Span mode, and choose the wallpaper you want. Reopen Settings after adding files to refresh the list.
+
+The wallpapers are distributed separately from the application. You can add or remove them freely without rebuilding Nordwall.
+
+## Using Nordwall
+
+Right-click the system tray icon to access **Pause / Resume**, **Open wallpapers folder**, and **Settings**. Double-clicking the tray icon also opens Settings.
+
+Settings contains the wallpaper picker, display mode, fullscreen auto-pause, and **Launch Nordwall at sign-in** option. Use **Exit Nordwall** in Settings to close the program.
+
+Autostart is **off by default**. When enabled, Nordwall adds an entry under the current Windows user's `Run` registry key. If you move `Nordwall.exe` to a different location, update the autostart setting afterwards.
+
+## Included ASCII wallpapers
+
+The source repository includes ten example ASCII animations in [`Nordwall/wallpapers`](Nordwall/wallpapers). These are examples for developers, **not** wallpapers automatically installed by the EXE.
+
+| Original collection | Second collection |
+| --- | --- |
+| Orbit | Tidal |
+| Waves | Matrix Rain |
+| Tunnel | Nocturne |
+| Aurora | Pulse |
+| Galaxy | Ember |
+
+All ten examples are self-contained HTML files with precomputed animation frames and seamless looping motion. For video wallpapers, playback support depends on the codecs available in your installed WebView2 Runtime.
+
+## Build from source
+
+To build Nordwall, install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) on Windows.
+
+Clone or download the repository, then double-click **`run.cmd`** to build and launch Nordwall. You can also run it from a terminal:
 
 ```powershell
 dotnet run --project Nordwall/Nordwall.csproj --configuration Release
 ```
 
-`run.cmd` starts the program through `dotnet run`, so the console may remain open until Nordwall exits.
-
-## Build a standalone EXE
-
-On a Windows x64 computer with the .NET 10 SDK installed, double-click **`publish.cmd`**. When the build finishes, it creates:
+To generate a self-contained Windows x64 EXE, run **`publish.cmd`**. The result is written to:
 
 ```text
 release/
@@ -35,52 +103,20 @@ release/
   Nordwall-standalone-win-x64.zip
 ```
 
-The publish command uses a **self-contained, single-file .NET deployment**. People who download `Nordwall.exe` do not need the .NET SDK or a separate .NET runtime. The WebView2 SDK libraries and native loader are included in the .NET single-file publish. **Microsoft Edge WebView2 Runtime** is still required separately; it is normally preinstalled on Windows 11.
+The publish command bundles .NET and the application assets into the EXE. The separate **WebView2 Runtime** is still required on the destination machine. The example wallpapers are not embedded or copied into the release output.
 
-The internal `assets` are embedded inside `Nordwall.exe`, so there is no `assets/` directory required next to the executable. On startup, Nordwall creates an **empty** `Documents\Wallpapers` folder (using your actual Windows Documents location). It never adds, restores, or overwrites wallpapers automatically. The internal video player is cached under `%LOCALAPPDATA%\Nordwall\assets`, which is created automatically. No setup wizard or SDK is needed on the user's PC.
+## Compatibility and limitations
 
-You can distribute **just `Nordwall.exe`**. Move it to its final location before enabling autostart. The system tray icon reads the icon already embedded in the executable.
+Nordwall is developed and tested on **Windows 11**. Windows 10 compatibility is not guaranteed and needs additional testing. Multi-display setups with mixed resolutions or DPI scaling may also require testing on individual systems.
 
-GitHub Actions is configured to build and upload the `Nordwall-standalone-win-x64` artifact on pushes and pull requests. No public release is made automatically.
+To draw behind desktop icons, Nordwall uses the undocumented Windows `Progman` / `WorkerW` desktop layout. Windows updates can change this behavior. The monitor map follows the arrangement configured in Windows; it does not change the actual display topology.
 
-## Controls
+Nordwall is intended for local, offline wallpapers. Its WebView2 host blocks external network requests from loaded wallpaper pages, but you should still use HTML wallpapers from sources you trust.
 
-Right-click the Nordwall icon in the system tray to select a wallpaper, pause/resume playback, open the wallpaper folder, toggle **Launch at sign-in**, or exit.
+Found a bug or have an idea? [Open an issue](https://github.com/NetGraniz/NordWall/issues).
 
-Startup is **disabled by default**. When enabled, Nordwall creates a registry value for the current Windows user under:
+## License and credits
 
-`HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run`
+Nordwall's source code is released under the [MIT License](LICENSE).
 
-The entry points to the full path of the running executable. Disable autostart before moving the program to a different folder, then enable it again from the new location. Administrator rights are not required.
-
-## Wallpapers
-
-Five optional HTML examples are kept in the source repository and can be published as a separate wallpaper pack. They are **not** included in the published executable:
-
-```text
-01-ascii-orbit.html
-02-ascii-waves.html
-03-ascii-tunnel.html
-04-ascii-aurora.html
-05-ascii-galaxy.html
-```
-
-Only each wallpaper's title is displayed beneath its ASCII artwork. Animation frames are precomputed, and their mathematical motion loops continuously without an abrupt reset.
-
-Put `.html`, `.htm`, `.mp4`, or `.webm` files directly into `Documents\Wallpapers`. The tray menu refreshes whenever it opens, so a restart is unnecessary to discover new files. Nested directories are not scanned yet. You can double-click the tray icon to open the exact folder. Nordwall never creates or restores wallpaper files; for example, deleting an HTML wallpaper leaves it deleted until you add it again.
-
-When upgrading from an earlier Nordwall release that stored media next to the EXE, copy any wallpapers you want to keep from the old `wallpapers` folder into `Documents\Wallpapers`. Nordwall does not move or delete those old files automatically.
-
-HTML files can reference local images, stylesheets, scripts, and fonts using relative paths. The host blocks requests to external websites. Video is muted, looped automatically, and fills the monitor using `object-fit: cover`.
-
-Actual CPU/GPU usage and video hardware decoding depend on the media file, codec, graphics driver, and WebView2 Runtime. Nordwall may appear as several processes in Task Manager.
-
-## Windows compatibility
-
-Nordwall currently supports the primary monitor only. The embedding code uses the undocumented `Progman` / `WorkerW` desktop layout and the `0x052C` message. On newer Windows 11 versions, `WorkerW` can be a child of `Progman` instead of a separate top-level window. Nordwall checks both layouts and uses a guarded fallback that orders the wallpaper behind desktop icons. Windows updates can change these internals.
-
-The WebView2 NuGet package may import an unused WPF reference into WinForms projects. `Nordwall.csproj` removes that reference before dependency resolution to address the `WindowsBase` MSB3277 warning, without suppressing other warnings.
-
-## Next steps
-
-Automatic pause for fullscreen games, multiple displays, more performance controls, startup diagnostics, and a signed installer.
+The README preview GIF is credited to its [original animation source](https://www.youtube.com/watch?v=gU4vSEZwiyE). Other media retain their respective creators' rights.
