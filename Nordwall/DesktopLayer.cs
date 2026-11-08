@@ -15,6 +15,7 @@ internal static class DesktopLayer
     private const long WsExLayered = 0x00080000L;
     private const uint LwaAlpha = 0x00000002;
     private const uint SwpNoActivate = 0x0010;
+    private const uint SwpNoZOrder = 0x0004;
     private const uint SwpFrameChanged = 0x0020;
     private const uint SwpShowWindow = 0x0040;
     private const uint SmtoAbortIfHung = 0x0002;
@@ -22,7 +23,7 @@ internal static class DesktopLayer
 
     private readonly record struct DesktopHost(IntPtr Parent, IntPtr Behind, bool RequiresLayered);
 
-    public static bool TryAttach(IntPtr windowHandle, Size size, out string failureReason)
+    public static bool TryAttach(IntPtr windowHandle, Rectangle screenBounds, out string failureReason)
     {
         DesktopHost? host = FindDesktopHost(out failureReason);
         if (host is null)
@@ -52,9 +53,15 @@ internal static class DesktopLayer
             return false;
         }
 
+        // Convert virtual-screen coordinates to the parent window's client
+        // coordinates. Secondary monitors may be left/above the primary one.
+        NativePoint point = new(screenBounds.Left, screenBounds.Top);
+        MapWindowPoints(IntPtr.Zero, host.Value.Parent, ref point, 1);
+
         // When parented to Progman, place the wallpaper strictly *behind* the
         // SHELLDLL_DefView icon window. Never allow a normal overlay above icons.
-        if (!SetWindowPos(windowHandle, host.Value.Behind, 0, 0, size.Width, size.Height,
+        if (!SetWindowPos(windowHandle, host.Value.Behind,
+                point.X, point.Y, screenBounds.Width, screenBounds.Height,
                 SwpNoActivate | SwpFrameChanged | SwpShowWindow))
         {
             failureReason = $"Cannot position the wallpaper (Win32 {Marshal.GetLastWin32Error()}).";
@@ -65,10 +72,26 @@ internal static class DesktopLayer
         return true;
     }
 
-    public static void Resize(IntPtr windowHandle, Size size)
+    public static void Resize(IntPtr windowHandle, Rectangle screenBounds)
     {
-        SetWindowPos(windowHandle, IntPtr.Zero, 0, 0, size.Width, size.Height,
-            SwpNoActivate | SwpFrameChanged | SwpShowWindow);
+        IntPtr parent = GetParent(windowHandle);
+        if (parent == IntPtr.Zero)
+            return;
+
+        NativePoint point = new(screenBounds.Left, screenBounds.Top);
+        MapWindowPoints(IntPtr.Zero, parent, ref point, 1);
+        // Preserve the existing ordering behind desktop icons during a resize.
+        SetWindowPos(windowHandle, IntPtr.Zero,
+            point.X, point.Y, screenBounds.Width, screenBounds.Height,
+            SwpNoActivate | SwpNoZOrder | SwpFrameChanged | SwpShowWindow);
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint
+    {
+        public int X;
+        public int Y;
+        public NativePoint(int x, int y) { X = x; Y = y; }
     }
 
     private static DesktopHost? FindDesktopHost(out string reason)
@@ -192,6 +215,10 @@ internal static class DesktopLayer
 
     [DllImport("user32.dll")]
     private static extern IntPtr GetParent(IntPtr child);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern int MapWindowPoints(IntPtr from, IntPtr to,
+        ref NativePoint points, uint count);
 
     [DllImport("user32.dll", SetLastError = true)]
     private static extern bool SetWindowPos(IntPtr window, IntPtr insertAfter,

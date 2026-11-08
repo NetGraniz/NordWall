@@ -1,6 +1,5 @@
 using Microsoft.Web.WebView2.Core;
 using Microsoft.Web.WebView2.WinForms;
-using Microsoft.Win32;
 
 namespace Nordwall;
 
@@ -11,20 +10,26 @@ internal sealed class WallpaperForm : Form
 
     private readonly string _wallpapersDirectory;
     private readonly string _assetsDirectory;
+    private readonly Rectangle _displayBounds;
     private readonly WebView2 _browser;
     private readonly Action<string> _reportError;
+    private string? _currentWallpaperName;
+    private bool _paused;
+    private int _pauseRevision;
 
-    public WallpaperForm(string wallpapersDirectory, string assetsDirectory, Action<string> reportError)
+    public WallpaperForm(string wallpapersDirectory, string assetsDirectory,
+        Rectangle displayBounds, Action<string> reportError)
     {
         _wallpapersDirectory = wallpapersDirectory;
         _assetsDirectory = assetsDirectory;
+        _displayBounds = displayBounds;
         _reportError = reportError;
 
         FormBorderStyle = FormBorderStyle.None;
         ShowInTaskbar = false;
         StartPosition = FormStartPosition.Manual;
         BackColor = Color.Black;
-        Bounds = Screen.PrimaryScreen?.Bounds ?? new Rectangle(0, 0, 1920, 1080);
+        Bounds = displayBounds;
 
         _browser = new WebView2
         {
@@ -32,8 +37,6 @@ internal sealed class WallpaperForm : Form
             DefaultBackgroundColor = Color.Black
         };
         Controls.Add(_browser);
-
-        SystemEvents.DisplaySettingsChanged += HandleDisplaySettingsChanged;
     }
 
     protected override CreateParams CreateParams
@@ -49,18 +52,11 @@ internal sealed class WallpaperForm : Form
     public bool AttachToDesktop(out string failureReason)
     {
         // Accessing Handle creates the native window before it becomes visible.
-        return DesktopLayer.TryAttach(Handle, Size, out failureReason);
+        return DesktopLayer.TryAttach(Handle, _displayBounds, out failureReason);
     }
 
-    public async Task InitializeBrowserAsync()
+    public async Task InitializeBrowserAsync(CoreWebView2Environment environment)
     {
-        string profile = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Nordwall", "WebView2");
-        Directory.CreateDirectory(profile);
-
-        CoreWebView2Environment environment = await CoreWebView2Environment.CreateAsync(
-            userDataFolder: profile);
         await _browser.EnsureCoreWebView2Async(environment);
 
         CoreWebView2 core = _browser.CoreWebView2;
@@ -102,6 +98,18 @@ internal sealed class WallpaperForm : Form
 
     public void Display(WallpaperFile wallpaper)
     {
+        if (_currentWallpaperName == wallpaper.Name)
+            return;
+
+        _currentWallpaperName = wallpaper.Name;
+        if (_paused)
+        {
+            _paused = false;
+            _pauseRevision++;
+            _browser.CoreWebView2.Resume();
+            _browser.Visible = true;
+        }
+
         string localAddress = "https://wallpapers.example/" + Uri.EscapeDataString(wallpaper.Name);
         string address = wallpaper.Type == WallpaperType.Html
             ? localAddress
@@ -112,8 +120,50 @@ internal sealed class WallpaperForm : Form
 
     public void Blank()
     {
-        // An empty document stops video playback and JavaScript timers altogether.
+        _currentWallpaperName = null;
         _browser.CoreWebView2.Navigate("about:blank");
+    }
+
+    /// <summary>
+    /// Hide and suspend the WebView2 renderer. Unlike navigating to about:blank,
+    /// this preserves the video's playback position and HTML page state.
+    /// </summary>
+    public async Task SetPlaybackPausedAsync(bool pause)
+    {
+        if (IsDisposed || !_browser.IsHandleCreated || _browser.CoreWebView2 is null)
+            return;
+
+        if (_paused == pause)
+            return;
+
+        _paused = pause;
+        int revision = ++_pauseRevision;
+        if (!pause)
+        {
+            _browser.CoreWebView2.Resume();
+            _browser.Visible = true;
+            return;
+        }
+
+        // Older WebView2 versions require the controller to be invisible
+        // before TrySuspendAsync; it also avoids rendering covered pixels.
+        _browser.Visible = false;
+        try
+        {
+            await _browser.CoreWebView2.TrySuspendAsync();
+        }
+        catch (Exception ex) when (ex is InvalidOperationException
+                                   or System.Runtime.InteropServices.COMException
+                                   or ObjectDisposedException)
+        {
+            // Hidden WebViews are still throttled if suspension is unavailable.
+        }
+
+        if (!IsDisposed && revision != _pauseRevision && !_paused)
+        {
+            _browser.CoreWebView2.Resume();
+            _browser.Visible = true;
+        }
     }
 
     private static bool IsAllowedResource(string address)
@@ -127,25 +177,4 @@ internal sealed class WallpaperForm : Form
                 || uri.Host.Equals("appassets.example", StringComparison.OrdinalIgnoreCase));
     }
 
-    private void HandleDisplaySettingsChanged(object? sender, EventArgs args)
-    {
-        if (IsDisposed || !IsHandleCreated)
-            return;
-
-        BeginInvoke((Action)(() =>
-        {
-            if (IsDisposed) return;
-            Size size = Screen.PrimaryScreen?.Bounds.Size ?? Size;
-            DesktopLayer.Resize(Handle, size);
-            Size = size;
-        }));
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-            SystemEvents.DisplaySettingsChanged -= HandleDisplaySettingsChanged;
-
-        base.Dispose(disposing);
-    }
 }

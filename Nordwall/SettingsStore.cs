@@ -1,11 +1,40 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Nordwall;
+
+[JsonConverter(typeof(JsonStringEnumConverter))]
+internal enum WallpaperMode
+{
+    Separate,
+    Span
+}
+
+internal sealed class DisplayPreferences
+{
+    // Retained for automatic migration from v0.3's settings.json.
+    public string? LastWallpaper { get; set; }
+    public WallpaperMode Mode { get; set; } = WallpaperMode.Separate;
+    public string? SpanWallpaper { get; set; }
+    public Dictionary<string, string?> PerMonitorWallpapers { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
+    public bool AutoPauseFullscreen { get; set; } = true;
+
+    public DisplayPreferences Clone() => new()
+    {
+        LastWallpaper = LastWallpaper,
+        Mode = Mode,
+        SpanWallpaper = SpanWallpaper,
+        PerMonitorWallpapers = new Dictionary<string, string?>(
+            PerMonitorWallpapers, StringComparer.OrdinalIgnoreCase),
+        AutoPauseFullscreen = AutoPauseFullscreen
+    };
+}
 
 internal sealed class SettingsStore
 {
     private readonly string _path;
-    public string? LastWallpaper { get; private set; }
+    public DisplayPreferences Current { get; private set; } = new();
 
     public SettingsStore()
     {
@@ -17,43 +46,32 @@ internal sealed class SettingsStore
         try
         {
             if (File.Exists(_path))
-                LastWallpaper = JsonSerializer.Deserialize<SavedSettings>(File.ReadAllText(_path))?.LastWallpaper;
+                Current = JsonSerializer.Deserialize<DisplayPreferences>(
+                    File.ReadAllText(_path)) ?? new DisplayPreferences();
+
+            Current.PerMonitorWallpapers ??= new(StringComparer.OrdinalIgnoreCase);
+            if (!Enum.IsDefined(Current.Mode))
+                Current.Mode = WallpaperMode.Separate;
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or IOException
+                                   or UnauthorizedAccessException or NotSupportedException)
         {
-            // A corrupted settings file should never prevent startup.
-        }
-        catch (IOException)
-        {
-            // The app can still run with the first available wallpaper.
-        }
-        catch (UnauthorizedAccessException)
-        {
-            // Settings are optional; the app will still load its wallpapers.
+            // Invalid or inaccessible settings must never prevent startup.
+            Current = new DisplayPreferences();
         }
     }
 
-    public void SaveSelection(string name)
+    public void Save(DisplayPreferences preferences)
     {
-        LastWallpaper = name;
-
+        Current = preferences.Clone();
         try
         {
-            File.WriteAllText(_path, JsonSerializer.Serialize(new SavedSettings { LastWallpaper = name }));
+            File.WriteAllText(_path, JsonSerializer.Serialize(Current,
+                new JsonSerializerOptions { WriteIndented = true }));
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Losing the remembered selection is non-fatal.
+            // The running wallpaper still uses the selected settings.
         }
-        catch (UnauthorizedAccessException)
-        {
-            // The desktop wallpaper remains functional without settings persistence.
-        }
-    }
-
-    private sealed class SavedSettings
-    {
-        public SavedSettings() { }
-        public string? LastWallpaper { get; set; }
     }
 }

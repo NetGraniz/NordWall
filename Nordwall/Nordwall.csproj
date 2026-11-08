@@ -10,7 +10,7 @@
     <RootNamespace>Nordwall</RootNamespace>
     <ApplicationIcon>assets\nordwall.ico</ApplicationIcon>
     <Product>Nordwall</Product>
-    <Version>0.3.0</Version>
+    <Version>0.4.0</Version>
     <UseAppHost>true</UseAppHost>
   </PropertyGroup>
 

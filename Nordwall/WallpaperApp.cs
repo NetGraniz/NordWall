@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Security;
 
 namespace Nordwall;
 
@@ -7,14 +6,12 @@ internal sealed class WallpaperApp : ApplicationContext
 {
     private readonly string _directory;
     private readonly SettingsStore _settings;
-    private readonly WallpaperForm _window;
+    private readonly WallpaperController _controller;
     private readonly ContextMenuStrip _menu;
     private readonly NotifyIcon _tray;
     private readonly Icon _appIcon;
 
-    private WallpaperFile? _selected;
-    private bool _isReady;
-    private bool _isPaused;
+    private SettingsForm? _settingsForm;
     private bool _isExiting;
 
     public WallpaperApp()
@@ -34,9 +31,10 @@ internal sealed class WallpaperApp : ApplicationContext
             ContextMenuStrip = _menu,
             Visible = true
         };
-        _tray.DoubleClick += (_, _) => OpenWallpapersDirectory();
+        _tray.DoubleClick += (_, _) => OpenSettings();
 
-        _window = new WallpaperForm(_directory, BundledContent.AssetsDirectory, ShowError);
+        _controller = new WallpaperController(_directory, BundledContent.AssetsDirectory,
+            _settings, ShowError);
         Application.Idle += HandleFirstIdle;
     }
 
@@ -51,27 +49,7 @@ internal sealed class WallpaperApp : ApplicationContext
         try
         {
             BundledContent.Prepare(_directory);
-
-            if (!_window.AttachToDesktop(out string layerError))
-            {
-                MessageBox.Show("Nordwall could not attach to the desktop. " + layerError +
-                    "\n\nTry restarting File Explorer or Nordwall.",
-                    "Nordwall", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                ExitApp();
-                return;
-            }
-
-            _window.Show();
-            await _window.InitializeBrowserAsync();
-            _isReady = true;
-
-            IReadOnlyList<WallpaperFile> files = WallpaperCatalog.GetAll(_directory);
-            WallpaperFile? initial = files.FirstOrDefault(file =>
-                file.Name.Equals(_settings.LastWallpaper, StringComparison.OrdinalIgnoreCase))
-                ?? files.FirstOrDefault();
-
-            if (initial != null)
-                SelectWallpaper(initial);
+            await _controller.StartAsync();
         }
         catch (Exception ex)
         {
@@ -82,34 +60,18 @@ internal sealed class WallpaperApp : ApplicationContext
         }
     }
 
-    private void SelectWallpaper(WallpaperFile file)
+    private async void TogglePause()
     {
-        if (!_isReady)
+        if (!_controller.IsReady)
             return;
-
-        if (!File.Exists(file.FullPath))
+        try
         {
-            ShowError("This file no longer exists. Reopen the tray menu to refresh the list.");
-            return;
+            await _controller.ToggleManualPauseAsync();
         }
-
-        _selected = file;
-        _settings.SaveSelection(file.Name);
-        _isPaused = false;
-        _window.Display(file);
-        _tray.Text = "Nordwall — " + (file.Name.Length > 42 ? file.Name[..42] : file.Name);
-    }
-
-    private void TogglePause()
-    {
-        if (!_isReady || _selected is null)
-            return;
-
-        _isPaused = !_isPaused;
-        if (_isPaused)
-            _window.Blank();
-        else
-            _window.Display(_selected);
+        catch (Exception ex)
+        {
+            ShowError("Cannot change playback state: " + ex.Message);
+        }
     }
 
     private void RebuildMenu()
@@ -121,64 +83,50 @@ internal sealed class WallpaperApp : ApplicationContext
             item.Dispose();
         }
 
-        _menu.Items.Add(new ToolStripMenuItem("Nordwall · Select wallpaper") { Enabled = false });
-        _menu.Items.Add(new ToolStripSeparator());
-
-        try
+        var pause = new ToolStripMenuItem(_controller.IsManuallyPaused ? "Resume" : "Pause")
         {
-            IReadOnlyList<WallpaperFile> files = WallpaperCatalog.GetAll(_directory);
-            if (files.Count == 0)
-                _menu.Items.Add(new ToolStripMenuItem("No HTML or MP4/WebM files found") { Enabled = false });
-
-            foreach (WallpaperFile file in files)
-            {
-                string type = file.Type == WallpaperType.Html ? "⌘" : "▶";
-                var item = new ToolStripMenuItem($"{type}  {file.Name}")
-                {
-                    Checked = _selected?.FullPath == file.FullPath,
-                    Enabled = _isReady
-                };
-                item.Click += (_, _) => SelectWallpaper(file);
-                _menu.Items.Add(item);
-            }
-        }
-        catch (IOException ex)
-        {
-            _menu.Items.Add(new ToolStripMenuItem($"Cannot read wallpaper folder: {ex.Message}")
-            {
-                Enabled = false
-            });
-        }
-        catch (UnauthorizedAccessException)
-        {
-            _menu.Items.Add(new ToolStripMenuItem("Access denied to the wallpapers folder")
-            {
-                Enabled = false
-            });
-        }
-
-        _menu.Items.Add(new ToolStripSeparator());
-        var pause = new ToolStripMenuItem(_isPaused ? "Resume" : "Pause")
-        {
-            Enabled = _isReady && _selected != null
+            Enabled = _controller.IsReady
         };
         pause.Click += (_, _) => TogglePause();
         _menu.Items.Add(pause);
-
-        var launchAtSignIn = new ToolStripMenuItem("Launch at sign-in")
-        {
-            Checked = StartupManager.IsEnabled()
-        };
-        launchAtSignIn.Click += (_, _) => ToggleStartup();
-        _menu.Items.Add(launchAtSignIn);
 
         var folder = new ToolStripMenuItem("Open wallpapers folder");
         folder.Click += (_, _) => OpenWallpapersDirectory();
         _menu.Items.Add(folder);
 
-        var exit = new ToolStripMenuItem("Exit");
-        exit.Click += (_, _) => ExitApp();
-        _menu.Items.Add(exit);
+        var settings = new ToolStripMenuItem("Settings...");
+        settings.Click += (_, _) => OpenSettings();
+        _menu.Items.Add(settings);
+    }
+
+    private void OpenSettings()
+    {
+        if (_isExiting)
+            return;
+
+        if (_settingsForm is { IsDisposed: false })
+        {
+            _settingsForm.BringToFront();
+            _settingsForm.Activate();
+            return;
+        }
+
+        _settingsForm = new SettingsForm(_settings.Current, Screen.AllScreens,
+            _directory, _appIcon, ApplySettings, ExitApp);
+        _settingsForm.FormClosed += (_, _) => _settingsForm = null;
+        _settingsForm.Show();
+    }
+
+    private async void ApplySettings(DisplayPreferences preferences)
+    {
+        try
+        {
+            await _controller.ApplySettingsAsync(preferences);
+        }
+        catch (Exception ex)
+        {
+            ShowError("Cannot apply wallpaper settings: " + ex.Message);
+        }
     }
 
     private void OpenWallpapersDirectory()
@@ -219,20 +167,6 @@ internal sealed class WallpaperApp : ApplicationContext
         return (Icon)SystemIcons.Application.Clone();
     }
 
-    private void ToggleStartup()
-    {
-        try
-        {
-            StartupManager.SetEnabled(!StartupManager.IsEnabled());
-        }
-        catch (Exception ex) when (ex is UnauthorizedAccessException or SecurityException
-                                   or IOException or InvalidOperationException)
-        {
-            MessageBox.Show($"Unable to change startup preference: {ex.Message}",
-                "Nordwall", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-        }
-    }
-
     private void ShowError(string text)
     {
         if (!_isExiting)
@@ -244,12 +178,12 @@ internal sealed class WallpaperApp : ApplicationContext
         if (_isExiting) return;
         _isExiting = true;
         Application.Idle -= HandleFirstIdle;
+        _settingsForm?.Close();
+        _controller.Dispose();
         _tray.Visible = false;
         _tray.Dispose();
         _appIcon.Dispose();
         _menu.Dispose();
-        _window.Close();
-        _window.Dispose();
         ExitThread();
     }
 }
