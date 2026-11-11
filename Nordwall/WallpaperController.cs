@@ -16,13 +16,13 @@ internal sealed class WallpaperController : IDisposable
     private readonly SettingsStore _settings;
     private readonly Action<string> _reportError;
     private readonly System.Windows.Forms.Timer _pollTimer;
+    private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly Dictionary<string, WallpaperForm> _views =
         new(StringComparer.OrdinalIgnoreCase);
+    private KeyValuePair<string, WallpaperForm>[] _viewSnapshot = [];
 
     private CoreWebView2Environment? _environment;
     private string _displaySignature = string.Empty;
-    private bool _configuring;
-    private bool _reconfigurePending;
     private bool _checking;
     private bool _running;
     private bool _disposed;
@@ -44,40 +44,76 @@ internal sealed class WallpaperController : IDisposable
 
     public async Task StartAsync()
     {
-        string profile = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "Nordwall", "WebView2");
-        Directory.CreateDirectory(profile);
-        _environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
-        await ConfigureWindowsAsync();
-        _running = true;
-        _pollTimer.Start();
+        await _operationGate.WaitAsync();
+        try
+        {
+            if (_disposed)
+                return;
+
+            string profile = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "Nordwall", "WebView2");
+            Directory.CreateDirectory(profile);
+            _environment = await CoreWebView2Environment.CreateAsync(userDataFolder: profile);
+            await ConfigureWindowsAsync();
+            if (_disposed)
+                return;
+            _running = true;
+            _pollTimer.Start();
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
     public async Task ApplySettingsAsync(DisplayPreferences newSettings)
     {
-        _settings.Save(newSettings);
-
-        if (!_running)
-            return;
-
-        await ConfigureWindowsAsync();
+        await _operationGate.WaitAsync();
+        try
+        {
+            if (_disposed)
+                return;
+            _settings.Save(newSettings);
+            if (_running)
+                await ConfigureWindowsAsync();
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
     public async Task ToggleManualPauseAsync()
     {
-        _manualPause = !_manualPause;
-        await RefreshPauseAsync(Screen.AllScreens);
+        await _operationGate.WaitAsync();
+        try
+        {
+            if (_disposed)
+                return;
+            _manualPause = !_manualPause;
+            await RefreshPauseAsync(Screen.AllScreens);
+        }
+        finally
+        {
+            _operationGate.Release();
+        }
     }
 
     private async void PollTimerTick(object? sender, EventArgs args)
     {
-        if (_disposed || _configuring || _checking)
+        if (_disposed || _checking)
             return;
 
         _checking = true;
+        bool entered = false;
         try
         {
+            await _operationGate.WaitAsync();
+            entered = true;
+            if (_disposed)
+                return;
+
             Screen[] screens = Screen.AllScreens;
             if (CalculateSignature(screens) != _displaySignature)
                 await ConfigureWindowsAsync();
@@ -90,6 +126,8 @@ internal sealed class WallpaperController : IDisposable
         }
         finally
         {
+            if (entered)
+                _operationGate.Release();
             _checking = false;
         }
     }
@@ -98,13 +136,7 @@ internal sealed class WallpaperController : IDisposable
     {
         if (_disposed)
             return;
-        if (_configuring)
-        {
-            _reconfigurePending = true;
-            return;
-        }
 
-        _configuring = true;
         var prepared = new Dictionary<string, WallpaperForm>(StringComparer.OrdinalIgnoreCase);
         try
         {
@@ -137,6 +169,8 @@ internal sealed class WallpaperController : IDisposable
 
                 view.Show();
                 await view.InitializeBrowserAsync(_environment);
+                if (_disposed)
+                    throw new ObjectDisposedException(nameof(WallpaperController));
 
                 view.Display(wallpaper);
             }
@@ -149,6 +183,7 @@ internal sealed class WallpaperController : IDisposable
             _views.Clear();
             foreach ((string key, WallpaperForm view) in prepared)
                 _views[key] = view;
+            _viewSnapshot = _views.ToArray();
             prepared.Clear();
 
             _displaySignature = CalculateSignature(screens);
@@ -162,19 +197,12 @@ internal sealed class WallpaperController : IDisposable
                 form.Dispose();
             }
 
+            if (_disposed)
+                return;
             if (!_running)
                 throw;
 
             _reportError("Unable to update display layout: " + ex.Message);
-        }
-        finally
-        {
-            _configuring = false;
-            if (_reconfigurePending && !_disposed)
-            {
-                _reconfigurePending = false;
-                _ = ConfigureWindowsAsync();
-            }
         }
     }
 
@@ -207,15 +235,17 @@ internal sealed class WallpaperController : IDisposable
 
     private async Task RefreshPauseAsync(Screen[] screens)
     {
-        if (_disposed || _views.Count == 0)
+        if (_disposed || _viewSnapshot.Length == 0)
             return;
 
         HashSet<string> fullscreen = _settings.Current.AutoPauseFullscreen
             ? FullscreenDetector.FindCoveredDisplays(screens)
             : new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach ((string key, WallpaperForm view) in _views)
+        foreach ((string key, WallpaperForm view) in _viewSnapshot)
         {
+            if (_disposed)
+                return;
             bool autoPause = key == SpanKey
                 ? fullscreen.Count > 0
                 : fullscreen.Contains(key);
@@ -241,5 +271,6 @@ internal sealed class WallpaperController : IDisposable
             view.Dispose();
         }
         _views.Clear();
+        _viewSnapshot = [];
     }
 }

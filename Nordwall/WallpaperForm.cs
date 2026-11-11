@@ -13,8 +13,11 @@ internal sealed class WallpaperForm : Form
     private readonly Rectangle _displayBounds;
     private readonly WebView2 _browser;
     private readonly Action<string> _reportError;
+    private readonly CancellationTokenSource _lifetime = new();
+    private CoreWebView2? _core;
     private string? _currentWallpaperName;
     private bool _paused;
+    private bool _disposing;
     private int _pauseRevision;
 
     public WallpaperForm(string wallpapersDirectory, string assetsDirectory,
@@ -59,7 +62,12 @@ internal sealed class WallpaperForm : Form
     {
         await _browser.EnsureCoreWebView2Async(environment);
 
-        CoreWebView2 core = _browser.CoreWebView2;
+        if (_disposing || IsDisposed || _browser.IsDisposed)
+            throw new ObjectDisposedException(nameof(WallpaperForm));
+
+        CoreWebView2 core = _browser.CoreWebView2
+            ?? throw new InvalidOperationException("WebView2 initialization did not complete.");
+        _core = core;
         core.Settings.AreDefaultContextMenusEnabled = false;
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.IsStatusBarEnabled = false;
@@ -101,12 +109,12 @@ internal sealed class WallpaperForm : Form
         if (_currentWallpaperName == wallpaper.Name)
             return;
 
+        CoreWebView2 core = GetCore();
         _currentWallpaperName = wallpaper.Name;
         if (_paused)
         {
             _paused = false;
             _pauseRevision++;
-            _browser.CoreWebView2.Resume();
             _browser.Visible = true;
         }
 
@@ -115,13 +123,13 @@ internal sealed class WallpaperForm : Form
             ? localAddress
             : "https://appassets.example/video-player.html?src=" + Uri.EscapeDataString(localAddress);
 
-        _browser.CoreWebView2.Navigate(address);
+        core.Navigate(address);
     }
 
     public void Blank()
     {
         _currentWallpaperName = null;
-        _browser.CoreWebView2.Navigate("about:blank");
+        GetCore().Navigate("about:blank");
     }
 
     /// <summary>
@@ -130,7 +138,8 @@ internal sealed class WallpaperForm : Form
     /// </summary>
     public async Task SetPlaybackPausedAsync(bool pause)
     {
-        if (IsDisposed || !_browser.IsHandleCreated || _browser.CoreWebView2 is null)
+        CoreWebView2? core = TryGetCore();
+        if (core is null)
             return;
 
         if (_paused == pause)
@@ -140,7 +149,6 @@ internal sealed class WallpaperForm : Form
         int revision = ++_pauseRevision;
         if (!pause)
         {
-            _browser.CoreWebView2.Resume();
             _browser.Visible = true;
             return;
         }
@@ -150,20 +158,30 @@ internal sealed class WallpaperForm : Form
         _browser.Visible = false;
         try
         {
-            await _browser.CoreWebView2.TrySuspendAsync();
+            await core.TrySuspendAsync().WaitAsync(_lifetime.Token);
         }
         catch (Exception ex) when (ex is InvalidOperationException
                                    or System.Runtime.InteropServices.COMException
-                                   or ObjectDisposedException)
+                                   or ObjectDisposedException
+                                   or OperationCanceledException)
         {
             // Hidden WebViews are still throttled if suspension is unavailable.
         }
 
-        if (!IsDisposed && revision != _pauseRevision && !_paused)
+        if (ReferenceEquals(core, TryGetCore()) && revision != _pauseRevision && !_paused)
         {
-            _browser.CoreWebView2.Resume();
             _browser.Visible = true;
         }
+    }
+
+    private CoreWebView2 GetCore() => TryGetCore()
+        ?? throw new ObjectDisposedException(nameof(WallpaperForm));
+
+    private CoreWebView2? TryGetCore()
+    {
+        if (_disposing || IsDisposed || _browser.IsDisposed || !_browser.IsHandleCreated)
+            return null;
+        return _core;
     }
 
     private static bool IsAllowedResource(string address)
@@ -175,6 +193,20 @@ internal sealed class WallpaperForm : Form
             && uri.Scheme == Uri.UriSchemeHttps
             && (uri.Host.Equals("wallpapers.example", StringComparison.OrdinalIgnoreCase)
                 || uri.Host.Equals("appassets.example", StringComparison.OrdinalIgnoreCase));
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing && !_disposing)
+        {
+            _disposing = true;
+            _pauseRevision++;
+            _core = null;
+            _lifetime.Cancel();
+        }
+        base.Dispose(disposing);
+        if (disposing)
+            _lifetime.Dispose();
     }
 
 }

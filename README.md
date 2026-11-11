@@ -12,7 +12,7 @@
 <p align="center">
   <a href="https://github.com/NetGraniz/NordWall/releases/latest"><strong>Download Nordwall</strong></a>
   &nbsp;·&nbsp;
-  <a href="https://github.com/NetGraniz/NordWall/releases/tag/v0.4.0">v0.4.0 Release</a>
+  <a href="https://github.com/NetGraniz/NordWall/releases/tag/v0.4.1">v0.4.1 Release</a>
   &nbsp;·&nbsp;
   <a href="https://github.com/NetGraniz/NordWall/issues">Issues &amp; feedback</a>
 </p>
